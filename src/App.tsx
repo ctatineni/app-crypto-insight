@@ -3,7 +3,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AppProvider } from "./contexts/AppContext";
 import MainLayout from "./components/layout/MainLayout";
 import Dashboard from "./pages/Dashboard";
@@ -15,7 +15,14 @@ import Settings from "./pages/Settings";
 import AppDetail from "./pages/AppDetail";
 import NotFound from "./pages/NotFound";
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      refetchOnWindowFocus: false,
+      retry: 1
+    }
+  }
+});
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
@@ -33,7 +40,10 @@ const App = () => (
               <Route path="analytics" element={<Analytics />} />
               <Route path="settings" element={<Settings />} />
               <Route path="app/:appId" element={<AppDetail />} />
+              {/* Redirect any unknown paths under MainLayout to Dashboard */}
+              <Route path="*" element={<Navigate to="/" replace />} />
             </Route>
+            {/* Catch-all route for any path not defined above */}
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>

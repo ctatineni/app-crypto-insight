@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { NavLink } from 'react-router-dom';
+import { NavLink, useLocation } from 'react-router-dom';
 import { 
   LayoutDashboard, 
   Shield, 
@@ -17,9 +17,10 @@ type NavItemProps = {
   icon: React.ReactNode;
   label: string;
   collapsed: boolean;
+  onClick?: () => void;
 };
 
-const NavItem = ({ to, icon, label, collapsed }: NavItemProps) => (
+const NavItem = ({ to, icon, label, collapsed, onClick }: NavItemProps) => (
   <NavLink 
     to={to} 
     className={({ isActive }) => 
@@ -28,6 +29,7 @@ const NavItem = ({ to, icon, label, collapsed }: NavItemProps) => (
         ? 'bg-crypto-teal text-white' 
         : 'hover:bg-slate-200 text-slate-700'}`
     }
+    onClick={onClick}
   >
     <span className="text-xl">{icon}</span>
     {!collapsed && <span className="font-medium">{label}</span>}
@@ -36,6 +38,7 @@ const NavItem = ({ to, icon, label, collapsed }: NavItemProps) => (
 
 const Sidebar = () => {
   const [collapsed, setCollapsed] = useState(false);
+  const location = useLocation();
 
   return (
     <div className={`h-screen bg-white border-r border-slate-200 flex flex-col transition-all ${collapsed ? 'w-16' : 'w-64'}`}>
@@ -50,6 +53,7 @@ const Sidebar = () => {
         <button
           onClick={() => setCollapsed(!collapsed)}
           className="p-1 rounded-full hover:bg-slate-200"
+          aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
         >
           {collapsed ? <ChevronRight /> : <ChevronLeft />}
         </button>
