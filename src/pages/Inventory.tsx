@@ -1,10 +1,12 @@
 
 import React, { useState } from 'react';
-import { Search, Filter, FileKey, Shield, Server } from 'lucide-react';
+import { Search, Filter, FileKey, Shield, Server, Lightbulb } from 'lucide-react';
 import { useAppContext } from '../contexts/AppContext';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from '@/components/ui/input';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
 import {
   PieChart,
   Pie,
@@ -13,10 +15,13 @@ import {
   Legend,
   Tooltip
 } from 'recharts';
+import { useToast } from '@/hooks/use-toast';
 
 const Inventory = () => {
   const { certificates, hosts, isLoading } = useAppContext();
   const [searchTerm, setSearchTerm] = useState('');
+  const [selectedAsset, setSelectedAsset] = useState<any | null>(null);
+  const { toast } = useToast();
   
   if (isLoading) {
     return (
@@ -69,8 +74,99 @@ const Inventory = () => {
     host.ipAddress.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
+  const getAiRecommendation = (asset: any, type: 'certificate' | 'host') => {
+    if (type === 'certificate') {
+      if (asset.isExpired) {
+        return "This certificate has expired. Urgent action required: Generate a new certificate using a modern algorithm like ECDSA with P-256 curve, implement auto-renewal with a service like Let's Encrypt, and update all dependencies.";
+      } else if (asset.algorithm === 'RSA' && asset.keySize < 3072) {
+        return "The RSA key size is below the recommended 3072 bits. Consider upgrading to ECDSA (P-256) for better security and performance or increase RSA key size to at least 3072 bits for sensitive data.";
+      } else if (asset.algorithm === 'HMAC' && asset.keySize < 256) {
+        return "HMAC key size is below recommended security levels. Increase key size to at least 256 bits and implement a key rotation policy with automatic updates.";
+      } else if (asset.vulnerabilities > 0) {
+        return `Found ${asset.vulnerabilities} potential security ${asset.vulnerabilities === 1 ? 'issue' : 'issues'} with this certificate. Check the Vulnerabilities tab for detailed information and remediation steps.`;
+      }
+      return "No immediate issues detected. Follow best practices by implementing regular key rotation and monitoring for algorithm deprecation notices.";
+    } else {
+      // Host recommendations
+      const lastScanDate = new Date(asset.lastScan);
+      const today = new Date();
+      const daysDifference = Math.floor((today.getTime() - lastScanDate.getTime()) / (1000 * 3600 * 24));
+      
+      if (daysDifference > 7) {
+        return `Last cryptographic scan was ${daysDifference} days ago. It's recommended to scan at least weekly for critical infrastructure. Schedule an automated scan now.`;
+      } else if (asset.type === 'Container') {
+        return "For containerized environments, ensure ephemeral secrets are properly managed. Use a secrets management solution like HashiCorp Vault or Kubernetes Secrets, and implement secrets rotation on container recreation.";
+      } else if (asset.os.includes('Ubuntu') || asset.os.includes('CentOS')) {
+        return `Ensure ${asset.os} is updated with the latest security patches. Implement automated vulnerability scanning for cryptographic libraries and configure automated updates for security patches.`;
+      }
+      return "Apply defense-in-depth strategies by implementing regular cryptographic inventory audits, secret scanning in CI/CD pipelines, and runtime protection.";
+    }
+  };
+
+  const handleShowRecommendation = (asset: any, type: 'certificate' | 'host') => {
+    setSelectedAsset({
+      ...asset,
+      type,
+      recommendation: getAiRecommendation(asset, type)
+    });
+  };
+
+  const handleApplyRecommendation = () => {
+    toast({
+      title: "Remediation plan created",
+      description: "The AI-recommended remediation plan has been added to your tasks",
+    });
+    setSelectedAsset(null);
+  };
+
   return (
     <div className="space-y-6">
+      {selectedAsset && (
+        <Dialog open={!!selectedAsset} onOpenChange={() => setSelectedAsset(null)}>
+          <DialogContent className="max-w-3xl">
+            <DialogHeader>
+              <DialogTitle className="text-xl flex items-center gap-2">
+                <Lightbulb className="h-5 w-5 text-crypto-teal" />
+                AI Remediation Recommendation
+              </DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              <div className="flex flex-col space-y-1.5">
+                <h3 className="font-semibold text-lg">Asset Details</h3>
+                <p className="text-sm text-muted-foreground">
+                  {selectedAsset.type === 'certificate' ? (
+                    <>
+                      <span className="font-medium">{selectedAsset.name}</span> - {selectedAsset.algorithm} {selectedAsset.keySize} bits
+                    </>
+                  ) : (
+                    <>
+                      <span className="font-medium">{selectedAsset.name}</span> - {selectedAsset.type}, {selectedAsset.os}
+                    </>
+                  )}
+                </p>
+              </div>
+              
+              <div className="space-y-2">
+                <h3 className="font-semibold text-lg flex items-center gap-2">
+                  <Lightbulb className="h-4 w-4 text-yellow-500" />
+                  AI Analysis
+                </h3>
+                <Card className="border-crypto-teal/20 bg-crypto-teal/5">
+                  <CardContent className="pt-6">
+                    <p>{selectedAsset.recommendation}</p>
+                  </CardContent>
+                </Card>
+              </div>
+              
+              <div className="pt-4 flex justify-end gap-3">
+                <Button variant="outline" onClick={() => setSelectedAsset(null)}>Cancel</Button>
+                <Button onClick={handleApplyRecommendation}>Apply Recommendation</Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
+
       <div className="flex flex-col md:flex-row justify-between gap-4">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-3 h-4 w-4 text-slate-400" />
@@ -184,6 +280,7 @@ const Inventory = () => {
                       <th className="text-center py-3 px-4 font-medium">Host Count</th>
                       <th className="text-center py-3 px-4 font-medium">Vulnerabilities</th>
                       <th className="text-right py-3 px-4 font-medium">Expires</th>
+                      <th className="text-center py-3 px-4 font-medium">Actions</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -209,6 +306,17 @@ const Inventory = () => {
                             {cert.isExpired ? 'EXPIRED' : cert.expires}
                           </span>
                         </td>
+                        <td className="py-3 px-4 text-center">
+                          <Button 
+                            size="sm" 
+                            variant="ghost" 
+                            className="hover:bg-crypto-teal/10 text-crypto-teal"
+                            onClick={() => handleShowRecommendation(cert, 'certificate')}
+                          >
+                            <Lightbulb className="h-4 w-4" />
+                            <span className="sr-only">AI Recommendations</span>
+                          </Button>
+                        </td>
                       </tr>
                     ))}
                   </tbody>
@@ -226,6 +334,7 @@ const Inventory = () => {
                       <th className="text-left py-3 px-4 font-medium">Operating System</th>
                       <th className="text-left py-3 px-4 font-medium">IP Address</th>
                       <th className="text-right py-3 px-4 font-medium">Last Scan</th>
+                      <th className="text-center py-3 px-4 font-medium">Actions</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -244,6 +353,17 @@ const Inventory = () => {
                         <td className="py-3 px-4 text-slate-600">{host.os}</td>
                         <td className="py-3 px-4 text-slate-600 font-mono">{host.ipAddress}</td>
                         <td className="py-3 px-4 text-right text-slate-600">{host.lastScan}</td>
+                        <td className="py-3 px-4 text-center">
+                          <Button 
+                            size="sm" 
+                            variant="ghost" 
+                            className="hover:bg-crypto-teal/10 text-crypto-teal"
+                            onClick={() => handleShowRecommendation(host, 'host')}
+                          >
+                            <Lightbulb className="h-4 w-4" />
+                            <span className="sr-only">AI Recommendations</span>
+                          </Button>
+                        </td>
                       </tr>
                     ))}
                   </tbody>
