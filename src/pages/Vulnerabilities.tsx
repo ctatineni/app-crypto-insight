@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { AlertTriangle, Search, Filter, X, ShieldAlert, ShieldCheck, ShieldQuestion, BarChart3 } from 'lucide-react';
 import { useAppContext } from '../contexts/AppContext';
@@ -15,7 +14,8 @@ import {
   YAxis,
   CartesianGrid,
   Tooltip,
-  ResponsiveContainer
+  ResponsiveContainer,
+  Cell
 } from 'recharts';
 
 type VulnerabilityType = {
